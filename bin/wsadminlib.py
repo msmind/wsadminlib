@@ -7954,7 +7954,7 @@ def createSIBJMSQueue(jmsQName, jmsQJNDI, jmsQDesc, SIBQName, scope):
     AdminTask.createSIBJMSQueue(scope, params)
 #endDef
 
-def createSIBQueue(clusterName, nodeName, serverName, SIBQName, SIBusName):
+def createSIBQueue(clusterName, nodeName, serverName, SIBQName, SIBusName, additionalParmsList=[]):
     """ This method encapsulates the actions needed to create a queue for the Service Integration Bus.
 
     Parameters:
@@ -7963,6 +7963,10 @@ def createSIBQueue(clusterName, nodeName, serverName, SIBQName, SIBusName):
         serverName - Name of server to associate queue with in String format.
         SIBQName - Name of queue to create in String format
         SIBusName - Name of bus to associate queue with in String format.
+        additionalParmsList - A list of name-value pairs for other SIB queue parameters.  Each
+                              name-value pair should be specified as a list, so this parameter is
+                              actually a list of lists. For example:
+                              ['-maxFailedDeliveries', '5', '-reliability', 'INHERIT']
     Returns:
         No return value
     """
@@ -7981,11 +7985,15 @@ def createSIBQueue(clusterName, nodeName, serverName, SIBQName, SIBusName):
     #--------------------------------------------------------------------
     # Create SIB queue
     #--------------------------------------------------------------------
-    if(clusterName == "none"):
+    if(clusterName == "none" or clusterName is None):
         params = ["-bus", SIBusName, "-name", SIBQName, "-type", "Queue", "-node", nodeName, "-server", serverName]
     else:
         params = ["-bus", SIBusName, "-name", SIBQName, "-type", "Queue", "-cluster", clusterName]
     #endElse
+
+    if additionalParmsList != []:
+        params.extend(additionalParmsList)
+
     AdminTask.createSIBDestination(params)
 #endDef
 
@@ -8871,7 +8879,7 @@ def createDataSource ( jdbcProvider, datasourceName, datasourceDescription, data
     create('J2EEResourcePropertySet', datasourceID, [], 'propertySet')
     return datasourceID
 
-def createDataSource_ext ( scope, clusterName, nodeName, serverName_scope, jdbcProvider, datasourceName, datasourceDescription, datasourceJNDIName, statementCacheSize, authAliasName, datasourceHelperClassname, dbType, nonTransDS='', cmpDatasource='true', xaRecoveryAuthAlias=None, databaseName=None, serverName=None, portNumber=None, driverType=None, URL=None, informixLockModeWait=None, ifxIFXHOST=None ):
+def createDataSource_ext ( scope, clusterName, nodeName, serverName_scope, jdbcProvider, datasourceName, datasourceDescription, datasourceJNDIName, statementCacheSize, authAliasName, datasourceHelperClassname, dbType, template=None, nonTransDS='', cmpDatasource='true', xaRecoveryAuthAlias=None, databaseName=None, serverName=None, portNumber=None, driverType=None, URL=None, informixLockModeWait=None, ifxIFXHOST=None ):
     """Creates a DataSource under the given JDBCProvider; removes existing objects with the same jndiName"""
 
     m = "createDataSource_ext"
@@ -8881,9 +8889,11 @@ def createDataSource_ext ( scope, clusterName, nodeName, serverName_scope, jdbcP
     mapping.append( [ 'mappingConfigAlias', 'DefaultPrincipalMapping' ] )
     attrs = []
     attrs.append( [ 'name', datasourceName ] )
-    attrs.append( [ 'description', datasourceDescription ] )
+    if datasourceDescription:
+        attrs.append( [ 'description', datasourceDescription ] )
     attrs.append( [ 'jndiName', datasourceJNDIName ] )
-    attrs.append( [ 'statementCacheSize', statementCacheSize ] )
+    if statementCacheSize:
+        attrs.append( [ 'statementCacheSize', statementCacheSize ] )
     attrs.append( [ 'authDataAlias', authAliasName ] )
     attrs.append( [ 'datasourceHelperClassname', datasourceHelperClassname ] )
     attrs.append( [ 'mapping', mapping ] )
@@ -8897,9 +8907,14 @@ def createDataSource_ext ( scope, clusterName, nodeName, serverName_scope, jdbcP
             attrs.append(['xaRecoveryAuthAlias', xaRecoveryAuthAlias])
         #endIf
     #endIf
-    sop (m, "calling removeAndCreate to create datasource")
-    datasourceID = removeAndCreate( 'DataSource', jdbcProvider, attrs, ['jndiName'])
-    create('J2EEResourcePropertySet', datasourceID, [], 'propertySet')
+
+    if template:
+        sop (m, "calling removeAndCreateUsingTemplate to create datasource")
+        datasourceID = removeAndCreateUsingTemplate( 'DataSource', jdbcProvider, attrs, template, ['jndiName'])
+    else:
+        sop (m, "calling removeAndCreate to create datasource")
+        datasourceID = removeAndCreate( 'DataSource', jdbcProvider, attrs, ['jndiName'])
+        create('J2EEResourcePropertySet', datasourceID, [], 'propertySet')
 
     # Create properties for the datasource based on the specified database type
 
@@ -9007,7 +9022,18 @@ def createDataSource_ext ( scope, clusterName, nodeName, serverName_scope, jdbcP
         return None
     #endif
 
+def removeDataSource ( scope, clusterName, nodeName, serverName, datasourceJNDIName, datasourceName ):
+    """Removes the DataSource object with the specified jndiName. Implicitly removes underlying DataSource objects."""
+    
+    m = "removeDataSource:"
+    
+    sop (m, "Entering removeDataSource...")
+    scopeId = getScopeId(scope, serverName, nodeName, clusterName)
 
+    cmpCFName = datasourceName+"_CF"
+    findAndRemove('CMPConnectorFactory', [[ 'name', cmpCFName ]], scopeId)
+    findAndRemove("DataSource", [[ 'jndiName', datasourceJNDIName ]], scopeId)
+    
 def configureDSConnectionPool (scope, clustername, nodename, servername, jdbcProviderName, datasourceName, connectionTimeout, minConnections, maxConnections, additionalParmsList=[]):
     """ This function configures the Connection Pool for the specified datasource for
         the specified JDBC Provider.
@@ -9154,7 +9180,7 @@ def testDataSourcesByJndiName ( jndiName ):
             raise Exception("Unable to establish a connection with DataSource %s" % (dataSource))
 
 def createCMPConnectorFactory ( scope, clusterName, nodeName, serverName, dataSourceName, authAliasName, datasourceId ):
-    """Creates a CMP Connection Factory at the scope identified by the scopeId.  This CMP Connection Factory corresponds to the specified datasource."""
+    """Creates or recreates if already exist a CMP Connection Factory at the scope identified by the scopeId.  This CMP Connection Factory corresponds to the specified datasource."""
 
     m = "createCMPConnectorFactory"
 
@@ -9162,40 +9188,28 @@ def createCMPConnectorFactory ( scope, clusterName, nodeName, serverName, dataSo
     cmpCFName = dataSourceName+"_CF"
     cmpCFAuthMech = "BASIC_PASSWORD"
     rraName = "WebSphere Relational Resource Adapter"
+    
+    sop(m, "calling getCfgItemId to get ID for %s" % rraName)
+    rraId = getCfgItemId(scope, clusterName, nodeName, serverName, "J2CResourceAdapter", rraName)
+    sop(m, "returned from calling getCfgItemId")
 
-    # Check if the connection factory already exists
-    objType = "J2CResourceAdapter:"+rraName+"/CMPConnectorFactory"
-    sop (m, "calling getCfgItemId with scope=%s, clusterName=%s, nodeName=%s, serverName=%s, objType=%s, cmpCFName=%s" % (scope, clusterName, nodeName, serverName, objType, cmpCFName))
-    cfgId = getCfgItemId(scope, clusterName, nodeName, serverName, objType, cmpCFName)
-    sop (m, "returned from calling getCfgItemId: returned value = '%s'" % cfgId)
-    if (cfgId != ""):
-        sop(m,""+cmpCFName+" already exists on "+scope+" "+scope)
-        return
-    else:
-        sop(m, "calling getCfgItemId to get ID for %s" % rraName)
-        rraId = getCfgItemId(scope, clusterName, nodeName, serverName, "J2CResourceAdapter", rraName)
-        sop(m, "returned from calling getCfgItemId")
-    #endIf
-
-    # Create connection factory using default RRA
+    # Create new or recreate existent cp connection factory using default RRA
 
     attrs = []
     attrs.append ( ["name", cmpCFName] )
     attrs.append ( ["authMechanismPreference", cmpCFAuthMech] )
     attrs.append ( ["cmpDatasource", datasourceId] )
-
-    sop(m, "calling AdminConfig.create to create CMPConnectorFactory")
-    cf = AdminConfig.create("CMPConnectorFactory", rraId,  attrs)
-
+    
+    cf = removeAndCreate("CMPConnectorFactory", rraId, attrs, ['name'])
+    
     # Mapping Module
 
     attrs1 = []
     attrs1.append ( ["authDataAlias", authAliasName] )
     attrs1.append ( ["mappingConfigAlias", "DefaultPrincipalMapping"] )
 
-    sop(m, "calling AdminConfig.create to create MappingModule")
-    mappingModule = AdminConfig.create("MappingModule", cf, attrs1)
-
+    mappingModule = create("MappingModule", cf, attrs1)
+    
     return cf
 
 ###############################################################################
