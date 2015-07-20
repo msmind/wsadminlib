@@ -5422,8 +5422,8 @@ def getObjectCustomProperty(object_id, propname):
     Write wrappers to be called externally.
     """
 
-    x = AdminConfig.showAttribute(object_id,'properties')[1:-1]
-    if len(x) == 0:
+    x = AdminConfig.showAttribute(object_id,'properties')
+    if len(x[1:-1]) == 0:
         return None  # no properties set yet
     #print "value of properties attribute=%s" % x
     # This can be of the format "[foo(value) bar(baz)]" where the values are "foo(value)",
@@ -6343,8 +6343,8 @@ def createSharedLibrary(libname, jarfile):
     """Creates a shared library on the specified cell with the given name and jarfile"""
     m = "createSharedLibrary:"
     #sop(m,"Entry. Create shared library. libname=%s jarfile=%s" % (repr(libname), repr(jarfile) ))
-    cellname = getCellName();
-    cell_id = getCellId(cellname);
+    cellname = getCellName()
+    cell_id = getCellId(cellname)
     #sop(m,"cell_id=%s " % ( repr(cell_id), ))
     result = AdminConfig.create('Library', cell_id, [['name', libname], ['classPath', jarfile]])
     #sop(m,"Exit. result=%s" % ( repr(result), ))
@@ -6353,8 +6353,8 @@ def createSharedLibraryIsolated (libname, jarfile, isolated):
     """Creates an isolated shared library on the specified cell with the given name and jarfile"""
     m = "createSharedLibraryIsolated:"
     #sop(m,"Entry. Create shared library isolated. libname=%s jarfile=%s isolated=%s" % (repr(libname), repr(jarfile), repr(isolated) ))
-    cellname = getCellName();
-    cell_id = getCellId(cellname);
+    cellname = getCellName()
+    cell_id = getCellId(cellname)
     #sop(m,"cell_id=%s " % ( repr(cell_id), ))
     result = AdminConfig.create('Library', cell_id, [['name', libname], ['classPath', jarfile], ['isolatedClassLoader', isolated]])
     #sop(m,"Exit. result=%s" % ( repr(result), ))
@@ -7232,7 +7232,7 @@ def saveAndSync():
     changes = _splitlines(AdminConfig.queryChanges())
     for change in changes:
         sop(m, "  "+change)
-    rc = 0;
+    rc = 0
     sop(m, "AdminConfig.getSaveMode()")
     mode = AdminConfig.getSaveMode()
     sop(m, "  "+mode)
@@ -10994,13 +10994,13 @@ def setCookieConfig(scope, serverName, nodeName, appName, maximumAge, name, doma
 
     m = "setCookieConfig:"
     if (scope == 'server'):
-        sop(m, "please use the modifyCookies() function instead of setCookieConfig, example: modifyCookies(nodeName,serverName,'true',maximumAge)");
+        sop(m, "please use the modifyCookies() function instead of setCookieConfig, example: modifyCookies(nodeName,serverName,'true',maximumAge)")
         # example: modifyCookies(nodeName,serverName,'true',maximumAge)
         return 99
     elif (scope == 'application'):
         setCookieConfigApplication(appName, maximumAge, name, domain, path, secure, httpOnly)
     else:
-        sop(m, "no scope set " + scope);
+        sop(m, "no scope set " + scope)
         return 99
 
 #end_def
