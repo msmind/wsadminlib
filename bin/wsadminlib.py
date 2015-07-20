@@ -7758,6 +7758,33 @@ def createSIBus_ext(SIBusName, desc, busSecurity, interAuth, medAuth, protocol, 
     #endElse
 #endDef
 
+def createSIBForeignBus(SIBusName, foreignBusName, routingType, foreignBusType):
+    """ This method encapsulates the actions needed to create a new service integration foreign bus.
+    It will check to see if the bus already exists. If not, it will add the member.
+
+    Parameters:
+        SIBusName - The name of the service integration bus for which you want to create the foreign bus. 
+        foreignBusName - The name by which you want the foreign bus to be known.
+        routingType - Create a foreign bus with the physical link (also known as the routing type) specified
+        type - Create a foreign bus with the type specified:
+            MQ - Create a foreign bus to link the service integration bus to a WebSphere® MQ network.
+            SIBus - Create a foreign bus to link the service integration bus to another service integration bus.
+    Returns:
+        No return value
+    """
+    m = "createSIBForeignBus: "
+    sop (m, "Entering createSIBForeignBus function...")
+
+    if foreignBusName in _splitlines(AdminTask.listSIBForeignBuses(['-bus', SIBusName])):
+        sop(m, "The %s SIB foreign bus for %s SIB bus already exists." % (foreignBusName, SIBusName))
+        return
+    #endIf
+
+    params = ['-bus', SIBusName, '-name', foreignBusName, '-routingType', routingType, '-type', foreignBusType]
+
+    AdminTask.createSIBForeignBus(params)
+#endDef
+
 
 def addSIBusMember_ext (clusterName, nodeName, serverName, SIBusName, messageStoreType, logSize, logDir, minPermStoreSize, minTempStoreSize, maxPermStoreSize, maxTempStoreSize, unlimPermStoreSize, unlimTempStoreSize, permStoreDirName, tempStoreDirName, createDataSrc, createTables, authAlias, schemaName, dataSrcJNDIName ):
 
@@ -7858,6 +7885,91 @@ def removeSIBusMember (SIBusName, nodeName, serverName):
     AdminTask.removeSIBusMember(["-bus", SIBusName, "-node", nodeName, "-server", serverName])
 
 
+def deleteSIBForeignBus (SIBusName, foreignBusName):
+    """ This method encapsulates the actions needed to remove a foreign bus from the named bus.
+
+    Parameters:
+        SIBusName - Name of bus to remove foreign bus from in String format.
+        foreignBusName - Name of foreign bus to remove in String format.
+    Returns:
+        No return value
+    """
+    m = "deleteSIBForeignBus: "
+    sop (m, "Entering deleteSIBForeignBus function...")
+
+    if not foreignBusName in _splitlines(AdminTask.listSIBForeignBuses(['-bus', SIBusName])):
+        sop(m, "The %s SIB foreign bus for %s SIB bus doesn't exist." % (foreignBusName, SIBusName))
+        return
+    #endIf
+
+    AdminTask.deleteSIBForeignBus(["-bus", SIBusName, "-name", foreignBusName])
+
+
+def createSIBMQLink(SIBusName, messagingEngine, mqLinkName, foreignBusName, queueManagerName, senderChTransportChain, optionalParmsList=[]):
+    """ This method encapsulates the actions needed to create a new WebSphere® MQ link for a specified service integration bus.
+
+    Parameters:
+        SIBusName - The name of the service integration bus for which you want to create the WebSphere MQ link. 
+        messagingEngine - The name of the messaging engine for which you want to create the WebSphere MQ link.
+        mqLinkName - The name by which you want the WebSphere MQ link to be known.
+        foreignBusName - The name of the foreign bus that defines the WebSphere MQ network for the WebSphere MQ link. 
+        queueManagerName - The name of the virtual queue manager associated with the messaging engine, and by which the messaging engine is known to a remote WebSphere MQ network.
+        senderChTransportChain - The name of the sender channel that sends messages to the gateway queue manager.
+        optionalParmsList - list of optionalParams in format:
+            ['-host', '127.0.0.1', '-port', '80']
+    Returns:
+        No return value
+    """
+    m = "createSIBMQLink: "
+    sop (m, "Entering createSIBMQLink function...")
+
+    params = ['-bus', SIBusName, '-messagingEngine', messagingEngine]
+
+    if mqLinkName in _splitlines(AdminTask.listSIBMQLinks(params)):
+        sop(m, "The %s mq link for %s SIB bus allready exist." % (mqLinkName, SIBusName))
+        return
+    #endIf
+
+    params.extend(['-name', mqLinkName, '-foreignBusName', foreignBusName, '-queueManagerName', queueManagerName, '-senderChannelTransportChain', senderChTransportChain])
+
+    if optionalParmsList != []:
+        params.extend(optionalParmsList)
+
+    AdminTask.createSIBMQLink(params)
+#endDef
+
+
+def deleteSIBMQLink (SIBusName, messagingEngine, mqLinkName):
+    """ This method encapsulates the actions needed to remove a MQ Link.
+
+    Parameters:
+        SIBusName - The name of the service integration bus for which you want to delete a WebSphere MQ link
+        messagingEngine - The name of the messaging engine to which the WebSphere MQ link was assigned when it was created.
+        mqLink - The name of the WebSphere MQ link that you want to delete.
+    Returns:
+        No return value
+    """
+    m = "deleteSIBMQLink: "
+    sop (m, "Entering deleteSIBMQLink function...")
+
+    if not SIBusName in [getObjectAttribute(i, 'name') for i in _splitlines(AdminTask.listSIBuses())]:
+        sop(m, "The %s SIB bus doesn't exist." % SIBusName)
+        return
+    #endIf
+
+    if not messagingEngine in [getObjectAttribute(i, 'name') for i in _splitlines(AdminTask.listSIBEngines(['-bus', SIBusName]))]:
+        sop(m, "The %s message engine doesn't exist in %s bus." % (messagingEngine, SIBusName))
+        return
+    #endIf
+
+    if not mqLinkName in _splitlines(AdminTask.listSIBMQLinks(['-bus', SIBusName, '-messagingEngine', messagingEngine])):
+       sop(m, "The %s mq link doesn't exit in %s message engine of %s bus" % (mqLinkName, messagingEngine, SIBusName))
+       return
+    #endIf
+
+    AdminTask.deleteSIBMQLink(["-bus", SIBusName, "-messagingEngine", messagingEngine, "-mqLink", mqLinkName])
+
+
 def modifySIBusMemberPolicy (SIBusName, clusterName, enableAssistance, policyName):
     """ This method encapsulates the actions needed to modify a bus member policy.
 
@@ -7875,7 +7987,7 @@ def modifySIBusMemberPolicy (SIBusName, clusterName, enableAssistance, policyNam
         AdminTask.modifySIBusMemberPolicy(["-bus", SIBusName, "-cluster", clusterName, "-enableAssistance", enableAssistance])
 
 
-def createSIBJMSConnectionFactory(clusterName, serverName, jmsCFName, jmsCFJNDI, jmsCFDesc, jmsCFType, SIBusName, provEndPoints, scope, authAlias=""):
+def createSIBJMSConnectionFactory(clusterName, serverName, jmsCFName, jmsCFJNDI, jmsCFDesc, jmsCFType, SIBusName, provEndPoints, scope, authAlias="", connPoolProps=[]):
     """ This method encapsulates the actions needed to create a JMS Connection Factory for handling connections between communicators and queues.
 
     Parameters:
@@ -7889,6 +8001,7 @@ def createSIBJMSConnectionFactory(clusterName, serverName, jmsCFName, jmsCFJNDI,
         provEndPoints - Provider of connection factory in String format
         scope - Identification of object (such as server or node) in String format.
         authAlias - Authentication alias for connection factory in String format
+        connPoolProps - connection pool properties
     Returns:
         No return value
     """
@@ -7896,7 +8009,7 @@ def createSIBJMSConnectionFactory(clusterName, serverName, jmsCFName, jmsCFJNDI,
     #--------------------------------------------------------------------
     # Create SIB JMS connection factory
     #--------------------------------------------------------------------
-    if(clusterName == "none"):
+    if(clusterName == "none" or clusterName is None):
         jmsCF = AdminConfig.getid('/Server:%s/J2CResourceAdapter:SIB JMS Resource Adapter/J2CConnectionFactory:%s' % (serverName,jmsCFName))
     else:
         jmsCF = AdminConfig.getid('/ServerCluster:%s/J2CResourceAdapter:SIB JMS Resource Adapter/J2CConnectionFactory:%s' % (clusterName,jmsCFName))
@@ -7909,7 +8022,11 @@ def createSIBJMSConnectionFactory(clusterName, serverName, jmsCFName, jmsCFJNDI,
     #--------------------------------------------------------------------
     # Create the SIB JMS connection factory
     #--------------------------------------------------------------------
-    params = ["-name", jmsCFName, "-jndiName", jmsCFJNDI, "-busName", SIBusName, "-description", jmsCFDesc]
+    params = ["-name", jmsCFName, "-jndiName", jmsCFJNDI, "-busName", SIBusName]
+    if(not(jmsCFDesc == "")):
+        params.append("-description")
+        params.append(jmsCFDesc)
+    #endIf
     if(not(jmsCFType == "")):
         params.append("-type")
         params.append(jmsCFType)
@@ -7919,14 +8036,205 @@ def createSIBJMSConnectionFactory(clusterName, serverName, jmsCFName, jmsCFJNDI,
         params.append(provEndPoints)
     #endIf
     if(not(authAlias == "")):
-        params.append("-containerAuthAlias")
+        params.append("-authDataAlias")
         params.append(authAlias)
     #endIf
 
     AdminTask.createSIBJMSConnectionFactory(scope, params)
 #endDef
 
-def createSIBJMSQueue(jmsQName, jmsQJNDI, jmsQDesc, SIBQName, scope):
+def configureJMSCFConnectionPool (scope, clustername, nodename, servername, jmsCFName, connectionPoolProperties=[]):
+    """ This function configures the Connection Pool for the specified JMS connection factory.
+
+        Input parameters:
+
+        scope - the scope of the JMS CF.  Valid values are 'cell', 'node', 'cluster', and 'server'.
+        clustername - name of the cluster for the JMS CF.  Required if scope = 'cluster'.
+        nodename - the name of the node for the JMS CF.  Required if scope = 'node' or 'server'.
+        servername - the name of the server for the JMS CF.  Required if scope = 'server'.
+        connectionPoolProperties - A list of name-value pairs for all Connection Pool parameters.  Each
+                              name-value pair should be specified as a list, so this parameter is
+                              actually a list of lists.  The following additional parameters can be
+                              specified:
+                              - 'reapTime' - Specifies the interval, in seconds, between runs of the
+                                             pool maintenance thread.  Valid range is 0 to the maximum
+                                             allowed integer.
+                              - 'unusedTimeout' - Specifies the interval in seconds after which an unused
+                                                  or idle connection is discarded.  Valid range is 0 to
+                                                  the maximum allowed integer.
+                              - 'agedTimeout' - Specifies the interval in seconds before a physical
+                                                connection is discarded.  Valid range is 0 to the maximum
+                                                allowed integer.
+                              - 'purgePolicy' - Specifies how to purge connections when a stale
+                                                connection or fatal connection error is detected.
+                                                Valid values are EntirePool and FailingConnectionOnly.
+                              - 'numberOfSharedPoolPartitions' - Specifies the number of partitions that
+                                                                 are created in each of the shared pools.
+                                                                 Valid range is 0 to the maximum allowed
+                                                                 integer.
+                              - 'numberOfFreePoolPartitions' - Specifies the number of partitions that
+                                                               are created in each of the free pools.
+                                                               Valid range is 0 to the maximum allowed
+                                                               integer.
+                              - 'freePoolDistributionTableSize' - Determines the distribution of Subject
+                                                                  and CRI hash values in the table that
+                                                                  indexes connection usage data.
+                                                                  Valid range is 0 to the maximum allowed
+                                                                  integer.
+                              - 'surgeThreshold' - Specifies the number of connections created before
+                                                   surge protection is activated.  Valid range is -1 to
+                                                   the maximum allowed integer.
+                              - 'surgeCreationInterval' - Specifies the amount of time between connection
+                                                          creates when you are in surge protection mode.
+                                                          Valid range is 0 to the maximum allowed integer.
+                              - 'stuckTimerTime' - This is how often, in seconds, the connection pool
+                                                   checks for stuck connections.  Valid range is 0 to the
+                                                   maximum allowed integer.
+                              - 'stuckTime' - The stuck time property is the interval, in seconds, allowed
+                                              for a single active connection to be in use to the backend
+                                              resource before it is considered to be stuck.  Valid range
+                                              is 0 to the maximum allowed integer.
+                              - 'stuckThreshold' - The stuck threshold is the number of connections that
+                                                   need to be considered stuck for the pool to be in stuck
+                                                   mode.  Valid range is 0 to the maximum allowed integer.
+
+        Here is an example of how the 'connectionPoolProperties" argument could be built by the caller:
+
+        connectionPoolProperties = []
+        connectionPoolProperties.append( [ 'unusedTimeout', '600' ] )
+        connectionPoolProperties.append( [ 'agedTimeout', '600' ] )
+
+        Outputs - No return values.  If an error is detected, an exception will be thrown.
+    """
+
+    m = "configureJMSCFConnectionPool:"
+    sop (m, "Entering function...")
+
+    jmsCFStringRepTempl = '/%s:%s/J2CResourceAdapter:SIB JMS Resource Adapter/J2CConnectionFactory:%s/'
+    if scope == 'cell':
+        jmsCFStringRep = jmsCFStringRepTempl % ('Cell', getCellName(), jmsCFName)
+    elif scope == 'cluster':
+        jmsCFStringRep = jmsCFStringRepTempl % ('ServerCluster', clustername, jmsCFName)
+    elif scope == 'node':
+        jmsCFStringRep = jmsCFStringRepTempl % ('Node', nodename, jmsCFName)
+    elif scope == 'server':
+        jmsCFStringRep = jmsCFStringRepTempl % ('Node:%s/Server' % nodename, servername, jmsCFName)
+    else:
+        raise 'Invalid scope specified: %s' % scope
+    #endif
+
+    sop (m, "Calling AdminConfig.getid with the following name: %s." % jmsCFStringRep)
+    jmsCFID = AdminConfig.getid(jmsCFStringRep)
+    sop (m, "Returned from AdminConfig.getid; returned jmsCFID = %s" % jmsCFID)
+
+    if jmsCFID == '':
+        raise 'Could not get config ID for name = %s' % jmsCFStringRep
+    else:
+        sop (m, "Calling AdminConfig.showAttribute to get the connectionPool config ID")
+        cpID = AdminConfig.showAttribute(jmsCFID,'connectionPool')
+        sop (m, "Returned from AdminConfig.showAttribute; returned cpID = %s" % cpID)
+        if cpID == '':
+            raise 'Could not get connectionPool config ID'
+        else:
+            sop (m, "Calling AdminConfig.modify with the following parameters: %s" % connectionPoolProperties)
+            AdminConfig.modify (cpID, connectionPoolProperties)
+            sop (m, "Returned from AdminConfig.modify")
+        #endif
+    #endif
+
+    sop (m, "Exiting function...")
+#endDef
+
+def createWMQQueue(wmqQName, wmqQJNDI, wmqQDesc, wmqBaseQName, scope):
+    """ This method encapsulates the actions needed to create a WMQ Queue for messages.
+
+    Parameters:
+        wmqQName - Name to use for queue in String format.
+        wmqQJNDI - JNDI Identifier to use for queue in String format.
+        wmqQDesc - Description of the queue in String format.
+        wmqBaseQName - Queue Name value used in protocol in String format
+        scope - Identification of object (such as server or node) in String format.
+    Returns:
+        No return value
+    """
+    m = "createWMQQueue: "
+    #--------------------------------------------------------------------
+    # Create MQ Queue
+    #--------------------------------------------------------------------
+
+    queues = getFilteredTypeList('MQQueue', [['jndiName', wmqQJNDI]])
+    if queues:
+        sop(m, "The %s MQ queue already exists." % wmqQJNDI)
+        return
+    #endIf
+
+    attrs = [["name", wmqQName], ["jndiName", wmqQJNDI], ["baseQueueName", wmqBaseQName], ['description', wmqQDesc]]
+
+    mqjmsprovider = None
+    for provider in getObjectsOfType('JMSProvider', scope):
+        name = AdminConfig.showAttribute(provider, "name")
+        if (name == 'WebSphere MQ JMS Provider'):
+            mqjmsprovider = provider[1:-1]
+            break
+        #endIf
+    #endFor
+    
+    if mqjmsprovider:
+        create('MQQueue', mqjmsprovider, attrs)
+    else:
+        sop(m, "The WebSphere MQ JMS Provider not found in scope '%s'." % scope)
+#endDef
+
+def createWMQCF(wmqCFName, wmqCFJNDI, wmqCFDesc, queueManager, host, port, channel, scope, additionalParmsList=[]):
+    """ This method encapsulates the actions needed to create a WMQ Queue for messages.
+
+    Parameters:
+        wmqCFName - Name to use for connection factory in String format.
+        wmqCFJNDI - JNDI Identifier to use for  connection factory in String format.
+        wmqCFDesc - Description of the queue in String format.
+        qmName - Queue Manager Name value used in protocol in String format
+        host - qm host name in String format
+        port - qm port in String format
+        channel - qm connection channel in String format
+        scope - Identification of object (such as server or node) in String format.
+    Returns:
+        No return value
+    """
+    m = "createWMQCF: "
+    #--------------------------------------------------------------------
+    # Create MQ CF
+    #--------------------------------------------------------------------
+    queues = getFilteredTypeList('MQConnectionFactory', [['jndiName', wmqCFJNDI]])
+    if queues:
+        sop(m, "The %s MQ CF already exists." % wmqCFJNDI)
+        return
+    #endIf
+
+    attrs = [["name", wmqCFName], ["jndiName", wmqCFJNDI], ["host", host], ["port", port], ["channel", channel], ["queueManager", queueManager], ['description', wmqCFDesc]]
+    
+    if additionalParmsList:
+        attrs.extend(additionalParmsList)
+    #endIf
+
+    mqjmsprovider = None
+    for provider in getObjectsOfType('JMSProvider', scope):
+        name = AdminConfig.showAttribute(provider, "name")
+        if (name == 'WebSphere MQ JMS Provider'):
+            mqjmsprovider = provider[1:-1]
+            break
+        #endIf
+    #endFor
+    
+    if mqjmsprovider:
+        mqcf = create('MQConnectionFactory', mqjmsprovider, attrs)
+    else:
+        sop(m, "The WebSphere MQ JMS Provider not found in scope '%s'." % scope)
+        return
+    #endIf
+    return mqcf
+#endDef
+
+def createSIBJMSQueue(jmsQName, jmsQJNDI, jmsQDesc, SIBQName, scope, SIBBusName=None):
     """ This method encapsulates the actions needed to create a JMS Queue for messages.
 
     Parameters:
@@ -7935,6 +8243,7 @@ def createSIBJMSQueue(jmsQName, jmsQJNDI, jmsQDesc, SIBQName, scope):
         jmsQDesc - Description of the queue in String format.
         SIBQName - Queue Name value used in protocol in String format
         scope - Identification of object (such as server or node) in String format.
+        SIBBusName - The name of the service integration bus that the service integration bus destination, identified by queueName, is configured on.
     Returns:
         No return value
     """
@@ -7950,7 +8259,15 @@ def createSIBJMSQueue(jmsQName, jmsQJNDI, jmsQDesc, SIBQName, scope):
         #endIf
     #endFor
 
-    params = ["-name", jmsQName, "-jndiName", jmsQJNDI, "-description", jmsQDesc, "-queueName", SIBQName]
+    params = ["-name", jmsQName, "-jndiName", jmsQJNDI, "-queueName", SIBQName]
+    
+    if not jmsQDesc is None:
+        params.extend(['-description', jmsQDesc])
+    #endIf
+    if not SIBBusName is None:
+        params.extend(['-busName', SIBusName])
+    #endIf
+
     AdminTask.createSIBJMSQueue(scope, params)
 #endDef
 
@@ -7994,8 +8311,56 @@ def createSIBQueue(clusterName, nodeName, serverName, SIBQName, SIBusName, addit
     if additionalParmsList != []:
         params.extend(additionalParmsList)
 
+    sop(m, params)
+
     AdminTask.createSIBDestination(params)
 #endDef
+
+
+def createSIBAlias(clusterName, nodeName, serverName, SIBAName, SIBusName, additionalParmsList=[]):
+    """ This method encapsulates the actions needed to create a destination alias for the Service Integration Bus.
+
+    Parameters:
+        clusterName - Name of the cluster to associate alias with in String format. If value is "none", server-node will be used instead of cluster
+        nodeName - Name of node containing server to associate alias with in String format.
+        serverName - Name of server to associate alias with in String format.
+        SIBAName - Name of alias to create in String format
+        SIBusName - Name of bus to associate alias with in String format.
+        additionalParmsList - A list of name-value pairs for other SIB alias parameters.  Each
+                              name-value pair should be specified as a list, so this parameter is
+                              actually a list. For example:
+                              ['-maxFailedDeliveries', '5', '-reliability', 'INHERIT']
+    Returns:
+        No return value
+    """
+    m = "createSIBAlias: "
+    #--------------------------------------------------------------------
+    # Create SIB alias
+    #--------------------------------------------------------------------
+    for alias in _splitlines(AdminConfig.list("SIBDestinationAlias")):
+        identifier = AdminConfig.showAttribute(alias, "identifier")
+        if (identifier == SIBAName):
+            sop(m, "The %s SIB alias already exists." % SIBAName)
+            return
+        #endIf
+    #endFor
+
+    #--------------------------------------------------------------------
+    # Create SIB alias
+    #--------------------------------------------------------------------
+    params = ["-bus", SIBusName, "-name", SIBAName, "-type", "Alias"]
+    if(clusterName == "none" or clusterName is None):
+        params.extend(["-node", nodeName, "-server", serverName])
+    else:
+        params.extend(["-cluster", clusterName])
+    #endElse
+
+    if additionalParmsList != []:
+        params.extend(additionalParmsList)
+
+    AdminTask.createSIBDestination(params)
+#endDef
+
 
 def createSIBJMSTopic(jmsTName, jmsTJNDI, jmsTDesc, SIBTName, SIBTopicSpace, scope):
     """ This method encapsulates the actions needed to create a JMS Topic.
@@ -8061,7 +8426,7 @@ def createSIBTopic(clusterName, nodeName, serverName, SIBTName, SIBusName):
     AdminTask.createSIBDestination(params)
 #endDef
 
-def createSIBJMSActivationSpec(activationSpecName, activationSpecJNDI, jmsQJNDI, destinationType, messageSelector, authAlias, SIBusName, scope):
+def createSIBJMSActivationSpec(activationSpecName, activationSpecJNDI, jmsQJNDI, destinationType, messageSelector, authAlias, SIBusName, scope, additionalParmsList=[]):
     """ This method encapsulates the actions needed to create a JMS Activation Specification.
 
     Parameters:
@@ -8073,6 +8438,11 @@ def createSIBJMSActivationSpec(activationSpecName, activationSpecJNDI, jmsQJNDI,
         authAlias - Authentication alias for activation spec in String format
         SIBusName - Name of bus to connect activation spec to in String format
         scope - Identification of object (such as server or node) in String format.
+        additionalParmsList - A list of name-value pairs for other SIB JMS AS parameters.  Each
+
+                              name-value pair should be specified as a list, so this parameter is
+                              actually a list. For example:
+                              ['-maxConcurrency', '5', '-maxBatchSize', '1']
     Returns:
         No return value
     """
@@ -8098,6 +8468,10 @@ def createSIBJMSActivationSpec(activationSpecName, activationSpecJNDI, jmsQJNDI,
         params.append("-messageSelector")
         params.append(messageSelector)
     #endIf
+
+    if additionalParmsList != []:
+        params.extend(additionalParmsList)
+
     AdminTask.createSIBJMSActivationSpec(scope, params)
 #endDef
 
@@ -8115,10 +8489,10 @@ def deleteSIBJMSConnectionFactory(jmsCFName, clusterName, serverName):
     #--------------------------------------------------------------------
     # Retrieve specific Object ID and remove Connection Factory using ID
     #--------------------------------------------------------------------
-    if(clusterName == "none"):
-        jmsCF = AdminConfig.getid('/Server:%s/J2CResourceAdapter:SIB JMS Resource Adapter/J2CConnectionFactory:%s' % (serverName,jmsCFName))
+    if(clusterName == "none" or clusterName is None):
+        jmsCF = getCfgItemId ('server', None, None, serverName, 'J2CResourceAdapter:SIB JMS Resource Adapter/J2CConnectionFactory', jmsCFName)
     else:
-        jmsCF = AdminConfig.getid('/Cluster:%s/J2CResourceAdapter:SIB JMS Resource Adapter/J2CConnectionFactory:%s' % (clusterName,jmsCFName))
+        jmsCF = getCfgItemId ('cluster', clusterName, None, None, 'J2CResourceAdapter:SIB JMS Resource Adapter/J2CConnectionFactory', jmsCFName)
     #endElse
     if(not(jmsCF == "")):
         AdminConfig.remove(jmsCF)
@@ -8142,10 +8516,10 @@ def deleteSIBJMSActivationSpec(jmsASName, clusterName, serverName):
     #--------------------------------------------------------------------
     # Retrieve specific Resource Adapter Type ID for SIB JMS Resource Adapter
     #--------------------------------------------------------------------
-    if(clusterName == "none"):
-        ra = AdminConfig.getid('/Server:%s/J2CResourceAdapter:SIB JMS Resource Adapter' % serverName)
+    if(clusterName == "none" or clusterName is None):
+        ra = getCfgItemId ('server', None, None, serverName, 'J2CResourceAdapter', 'SIB JMS Resource Adapter')
     else:
-        ra = AdminConfig.getid('/Cluster:%s/J2CResourceAdapter:SIB JMS Resource Adapter' % clusterName)
+        ra = getCfgItemId ('cluster', clusterName, None, None, 'J2CResourceAdapter', 'SIB JMS Resource Adapter')
     #endElse
 
     #--------------------------------------------------------------------
@@ -8161,6 +8535,62 @@ def deleteSIBJMSActivationSpec(jmsASName, clusterName, serverName):
     #endFor
 
     sop(m, "ActivationSpec %s not found" % jmsASName)
+#endDef
+
+def deleteWMQQueue(wmqQName, scope):
+    """ This method encapsulates the actions needed to delete a WMQ JMS Queue.
+
+    Parameters:
+        wmqQName - Name of WMQ queue in String format.
+        scope - Identification of object (such as server or node) in String format.
+    Returns:
+        No return value
+    """
+    m = "deleteWMQQueue: "
+    #--------------------------------------------------------------------
+    # Search for queue based on scope and delete
+    #--------------------------------------------------------------------
+    mqjmsprovider = None
+    for provider in getObjectsOfType('JMSProvider', scope):
+        name = AdminConfig.showAttribute(provider, "name")
+        if (name == 'WebSphere MQ JMS Provider'):
+            mqjmsprovider = provider
+            break
+        #endIf
+    #endFor
+    
+    if mqjmsprovider:
+        findAndRemove('MQConnectionFactory', [[ 'name', wmqQName ]], mqjmsprovider)
+    else:
+        sop(m, "The WebSphere MQ JMS Provider not found in scope '%s'." % scope)
+#endDef
+
+def deleteWMQCF(wmqCFName, scope):
+    """ This method encapsulates the actions needed to delete a WMQ CF.
+
+    Parameters:
+        wmqCFName - Name of WMQ CF in String format.
+        scope - Identification of object (such as server or node) in String format.
+    Returns:
+        No return value
+    """
+    m = "deleteWMQCF: "
+    #--------------------------------------------------------------------
+    # Search for queue based on scope and delete
+    #--------------------------------------------------------------------
+    mqjmsprovider = None
+    for provider in getObjectsOfType('JMSProvider', scope):
+        name = AdminConfig.showAttribute(provider, "name")
+        if (name == 'WebSphere MQ JMS Provider'):
+            mqjmsprovider = provider
+            break
+        #endIf
+    #endFor
+    
+    if mqjmsprovider:
+        findAndRemove('MQConnectionFactory', [[ 'name', wmqCFName ]], mqjmsprovider)
+    else:
+        sop(m, "The WebSphere MQ JMS Provider not found in scope '%s'." % scope)
 #endDef
 
 def deleteSIBJMSQueue(qName, scope):
@@ -8231,6 +8661,34 @@ def deleteSIBQueue(qName, SIBusName):
             if (name == qName):
                 AdminTask.deleteSIBDestination(params)
                 sop(m, "Deleted destination %s" % qName)
+                return
+            #endIf
+        #endFor
+    #endIf
+#endDef
+
+def deleteSIBAlias(aName, SIBusName):
+    """ This method encapsulates the actions needed to delete a SIB Queue.
+
+    Parameters:
+        aName - Name of SIB destination alias in String format.
+        SIBusName - Name of the bus the queue is associated with in String format.
+    Returns:
+        No return value
+    """
+    m = "deleteSIBAlias: "
+    #--------------------------------------------------------------------
+    # Search for queue based on scope and delete
+    #--------------------------------------------------------------------
+    params = ["-bus", SIBusName, "-name", aName]
+    scope = ["-bus", SIBusName, "-type", "Alias"]
+
+    if(not(re.compile(SIBusName, 0).search(AdminTask.listSIBuses())==None)):
+        for q in _splitlines(AdminTask.listSIBDestinations(scope)):
+            name = AdminConfig.showAttribute(q, "identifier")
+            if (name == aName):
+                AdminTask.deleteSIBDestination(params)
+                sop(m, "Deleted destination %s" % aName)
                 return
             #endIf
         #endFor
@@ -8846,17 +9304,28 @@ def filterTypeList( list, attrs ):
 ###############################################################################
 # JDBC
 
-def createJdbcProvider ( parent, name, classpath, nativepath, implementationClassName, description, providerType=None ):
+def createJdbcProvider ( parent, name, classpath, nativepath, implementationClassName, description, providerType=None, templateId=None ):
     """Creates a JDBCProvider in the specified parent scope; removes existing objects with the same name"""
     attrs = []
     attrs.append( [ 'name', name ] )
-    attrs.append( [ 'classpath', classpath ] )
-    attrs.append( [ 'nativepath', nativepath ] )
-    attrs.append( [ 'implementationClassName', implementationClassName ] )
-    attrs.append( [ 'description', description ] )
+    if classpath: 
+        attrs.append( [ 'classpath', classpath ] )
+    if nativepath: 
+        attrs.append( [ 'nativepath', nativepath ] )
+    if implementationClassName: 
+        attrs.append( [ 'implementationClassName', implementationClassName ] )
+    if description:
+        attrs.append( [ 'description', description ] )
     if providerType:
         attrs.append( [ 'providerType', providerType ] )
-    return removeAndCreate('JDBCProvider', parent, attrs, ['name'])
+    
+    if templateId:
+        object = removeAndCreateUsingTemplate('JDBCProvider', parent, attrs, templateId, ['name'] )
+    else:
+        object = removeAndCreate('JDBCProvider', parent, attrs, ['name'])
+    #endIf
+
+    return object
 
 def removeJdbcProvidersByName ( providerName ):
     """Removes all the JDBCProvider objects with the specified name.  Implicitly deletes underlying DataSource objects."""
@@ -9156,13 +9625,14 @@ def configureDSConnectionPool (scope, clustername, nodename, servername, jdbcPro
 #endDef
 
 
-def setJ2eeResourceProperty ( parent, propName, propType, propValue, propDescription ):
+def setJ2eeResourceProperty ( parent, propName, propType, propValue, propDescription='' ):
     """Sets a J2EEResourceProperty on the object specified by parent; parent must have a PropertySet child attribute named 'propertySet'"""
     attrs = []
     attrs.append( [ 'name', propName ] )
     attrs.append( [ 'type', propType ] )
     attrs.append( [ 'value', propValue ] )
-    attrs.append( [ 'description', propDescription ] )
+    if propDescription:
+        attrs.append( [ 'description', propDescription ] )
     propSet = getObjectAttribute(parent, 'propertySet')
     removeAndCreate('J2EEResourceProperty', propSet, attrs, ['name'])
 
@@ -9568,8 +10038,8 @@ def configureRRD (appName, allowDispatchRemoteInclude, allowServiceRemoteInclude
     deployedObject = AdminConfig.showAttribute(deployments, 'deployedObject')
     AdminConfig.modify(deployedObject, [['allowDispatchRemoteInclude', allowDispatchRemoteInclude], ['allowServiceRemoteInclude', allowServiceRemoteInclude]])
 
-def createJ2EEResourceProperty(propSetID, propName, propType, propValue ):
-    return create('J2EEResourceProperty', propSetID, [['name', propName],['type', propType],['value', propValue],['description','']])
+def createJ2EEResourceProperty(propSetID, propName, propType, propValue, propDesc = '' ):
+    return create('J2EEResourceProperty', propSetID, [['name', propName],['type', propType],['value', propValue],['description', propDesc]])
 
 def createDerbyDataSource( jdbcProvider, datasourceJNDIName, authAliasName, databaseName, datasourceName=None ):
     datasourceHelperClassname = "com.ibm.websphere.rsadapter.DerbyDataStoreHelper"
